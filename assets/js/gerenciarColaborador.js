@@ -1,30 +1,38 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', function () {
     const btnSair = document.getElementById('btnSair');
-    const btnAdicionarUsuario = document.getElementById('btnAdicionarUsuario');
     const modal = document.getElementById('modal');
     const closeBtn = document.querySelector('.close-btn');
     const userForm = document.getElementById('userForm');
     const submitBtn = document.getElementById('submitBtn');
     const collaboratorList = document.getElementById('collaboratorList');
-
+    const btnAdicionarUsuario = document.getElementById('btnAdicionarUsuario');
     let currentCollaboratorId = null;
 
     const loggedInUser = JSON.parse(localStorage.getItem('loggedInUser'));
+
     if (!loggedInUser) {
-        alert('Você não está logado.');
-        window.location.href = 'login.html';
+        alert("Você não está logado.");
+        window.location.href = "login.html";
         return;
     }
 
-    btnSair.addEventListener('click', () => {
-        localStorage.removeItem('loggedInUser');
-        window.location.href = 'login.html';
-    });
+    if (btnSair) {
+        btnSair.addEventListener('click', () => {
+            localStorage.removeItem('loggedInUser');
+            window.location.href = 'login.html';
+        });
+    }
 
-    btnAdicionarUsuario.addEventListener('click', () => {
-        resetModal();
-        showModal('Cadastrar Novo Colaborador', 'Cadastrar');
-    });
+    function showModal(title, actionText) {
+        document.getElementById('modalTitle').textContent = title;
+        submitBtn.textContent = actionText;
+        modal.style.display = 'block';
+    }
+
+    function resetModal() {
+        currentCollaboratorId = null;
+        userForm.reset();
+    }
 
     closeBtn.addEventListener('click', () => {
         modal.style.display = 'none';
@@ -38,6 +46,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    btnAdicionarUsuario.addEventListener('click', () => {
+        resetModal();
+        showModal('Cadastrar Novo Colaborador', 'Cadastrar');
+    });
+
     userForm.addEventListener('submit', (e) => {
         e.preventDefault();
 
@@ -46,8 +59,24 @@ document.addEventListener('DOMContentLoaded', () => {
         const email = document.getElementById('email').value.trim();
         const role = document.getElementById('role').value.trim();
 
-        if (!username || !contact || !email || !role) {
-            alert('Por favor, preencha todos os campos.');
+        // Validações
+        if (username.length < 3 || !/^[A-Za-zÀ-ÿ\s]+$/.test(username)) {
+            alert('Nome deve ter pelo menos 3 letras e conter apenas letras e espaços.');
+            return;
+        }
+
+        if (!/^(\(\d{2}\)\s?)?\d{4,5}-\d{4}$/.test(contact)) {
+            alert('Contato deve ser um telefone válido. Ex: (99) 99999-9999 ou 99999-9999');
+            return;
+        }
+
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            alert('Informe um e-mail válido.');
+            return;
+        }
+
+        if (role.length < 2) {
+            alert('Cargo deve ter pelo menos 2 caracteres.');
             return;
         }
 
@@ -59,43 +88,28 @@ document.addEventListener('DOMContentLoaded', () => {
             userId: loggedInUser.id
         };
 
-        if (currentCollaboratorId) {
-            // Editar colaborador
-            fetch(`http://localhost:3003/colaboradores/${currentCollaboratorId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(collaborator)
+        const url = currentCollaboratorId
+            ? `http://localhost:3003/colaboradores/${currentCollaboratorId}`
+            : 'http://localhost:3003/colaboradores';
+
+        const method = currentCollaboratorId ? 'PUT' : 'POST';
+
+        fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(collaborator)
+        })
+            .then(res => {
+                if (!res.ok) throw new Error(currentCollaboratorId ? 'Erro ao atualizar' : 'Erro ao cadastrar');
+                return res.json();
             })
-                .then(res => {
-                    if (!res.ok) throw new Error('Erro ao atualizar');
-                    return res.json();
-                })
-                .then(() => {
-                    alert(`Colaborador ${username} atualizado com sucesso!`);
-                    listarColaboradores();
-                    modal.style.display = 'none';
-                    resetModal();
-                })
-                .catch(() => alert('Erro ao atualizar o colaborador.'));
-        } else {
-            // Cadastrar novo colaborador
-            fetch('http://localhost:3003/colaboradores', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(collaborator)
+            .then(() => {
+                alert(`Colaborador ${username} ${currentCollaboratorId ? 'atualizado' : 'cadastrado'} com sucesso!`);
+                listarColaboradores();
+                modal.style.display = 'none';
+                resetModal();
             })
-                .then(res => {
-                    if (!res.ok) throw new Error('Erro ao cadastrar');
-                    return res.json();
-                })
-                .then(() => {
-                    alert(`Colaborador ${username} cadastrado com sucesso!`);
-                    listarColaboradores();
-                    modal.style.display = 'none';
-                    resetModal();
-                })
-                .catch(() => alert('Erro ao cadastrar o colaborador.'));
-        }
+            .catch(() => alert(`Erro ao ${currentCollaboratorId ? 'atualizar' : 'cadastrar'} o colaborador.`));
     });
 
     function listarColaboradores() {
@@ -123,7 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
             .catch(() => alert('Erro ao carregar colaboradores.'));
     }
 
-    window.editarColaborador = function(id) {
+    window.editarColaborador = function (id) {
         fetch(`http://localhost:3003/colaboradores/${id}`)
             .then(res => res.json())
             .then(c => {
@@ -137,7 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
             .catch(() => alert('Erro ao carregar colaborador.'));
     };
 
-    window.excluirColaborador = function(id) {
+    window.excluirColaborador = function (id) {
         if (confirm('Tem certeza que deseja excluir este colaborador?')) {
             fetch(`http://localhost:3003/colaboradores/${id}`, {
                 method: 'DELETE'
@@ -151,16 +165,5 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    function resetModal() {
-        currentCollaboratorId = null;
-        userForm.reset();
-    }
-
-    function showModal(title, actionText) {
-        document.getElementById('modalTitle').textContent = title;
-        submitBtn.textContent = actionText;
-        modal.style.display = 'block';
-    }
-
-    listarColaboradores();
+    listarColaboradores(); // Inicia listagem
 });
